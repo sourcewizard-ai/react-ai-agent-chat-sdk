@@ -58,7 +58,7 @@ export async function streamMessage<TTools extends Record<string, any>>(config: 
       // Don't fail the request if storage fails
     }
   }
-  
+
   try {
     const convertedMessages = convertToModelMessages(chatRequest.messages);
 
@@ -70,34 +70,48 @@ export async function streamMessage<TTools extends Record<string, any>>(config: 
       temperature: config.model?.temperature || 0.3,
       experimental_transform: smoothStream({ chunking: 'word', delayInMs: 20 }),
       stopWhen: config.model?.stopWhen || stepCountIs(5),
-      onStepFinish: config.model?.onStepFinish || ((step: StepResult<TTools>) => {
-        // Save assistant message to storage if conversation_id is provided
-        if (config.storage && chatRequest.conversation_id && step.text) {
-          config.storage.saveMessage(chatRequest.conversation_id, {
-            id: crypto.randomUUID(),
-            role: 'assistant',
-            content: step.text,
-            timestamp: new Date(),
-            toolCalls: step.toolCalls?.map(tc => ({
-              toolCallId: tc.toolCallId,
-              toolName: tc.toolName,
-              input: (tc as any).args || (tc as any).arguments,
-            })),
-            toolResults: step.toolResults?.map(tr => ({
-              toolCallId: tr.toolCallId,
-              toolName: tr.toolName,
-              output: (tr as any).result || (tr as any).output,
-              error: (tr as any).error?.message,
-              isError: !!(tr as any).error,
-            })),
-          }).catch(error => {
-            console.error('Failed to save assistant message:', error);
-          });
-        }
-      }),
+      onStepFinish: config.model?.onStepFinish,
       tools: config.tools,
     });
-    return result.toUIMessageStreamResponse();
+    const response = result.toUIMessageStreamResponse({
+      onFinish: ({ messages }) => {
+        // Save messages using the native UIMessage format from AI SDK
+        if (config.storage && chatRequest.conversation_id && messages && messages.length > 0) {
+          const lastMessage = messages[messages.length - 1];
+          if (lastMessage.role === 'assistant') {
+            console.log('💾 Saving assistant message using AI SDK native format:', {
+              messageId: lastMessage.id,
+              partsCount: lastMessage.parts.length,
+              partTypes: lastMessage.parts.map(p => p.type),
+              hasToolParts: lastMessage.parts.some(p => p.type.startsWith('tool-')),
+            });
+
+            // Convert UIMessage to our storage format  
+            config.storage.saveMessage(chatRequest.conversation_id, {
+              id: lastMessage.id,
+              role: lastMessage.role,
+              content: lastMessage.parts
+                .filter(part => part.type === 'text')
+                .map(part => (part as any).text)
+                .join(''),
+              timestamp: new Date(),
+              uiMessageParts: lastMessage.parts, // Store the native AI SDK parts
+            }).catch(error => {
+              console.error('Failed to save assistant message:', error);
+            });
+          }
+        }
+      }
+    });
+
+    // Consume the stream to ensure message isn't lost on page refresh
+    result.consumeStream({
+      onError: (error) => {
+        console.error('❌ Stream consumption error:', error);
+      }
+    });
+
+    return response;
   } catch (error) {
     console.error('❌ ERROR in chat handler:', error);
     return new Response('Internal Server Error', { status: 500 });

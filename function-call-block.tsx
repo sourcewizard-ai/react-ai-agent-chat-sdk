@@ -29,7 +29,7 @@ export const FunctionCallBlock = ({ toolCall, toolResult }: FunctionCallBlockPro
   const hasError = toolResult?.output?.__toolError;
   const isTimeout = hasError && toolResult?.output?.__errorType === 'ToolTimeoutError';
   const isRetryExhausted = hasError && toolResult?.output?.__errorType === 'ToolRetryExhaustedError';
-  const isSuccess = toolResult && !hasError && (toolResult.output || toolResult.result);
+  const isSuccess = toolResult && !hasError && toolResult.output;
 
   const getFunctionName = (toolName: string) => {
     if (toolName in tools) {

@@ -54,6 +54,23 @@ export const AgentChatProvider = ({ config, conversationId, children }: AgentCha
           if (conversation && conversation.messages && conversation.messages.length > 0) {
             // Convert ChatMessage[] to UIMessage[] format expected by AI SDK
             const aiMessages: UIMessage[] = conversation.messages.map((msg: ChatMessage) => {
+              // If we have native UI message parts, use them directly (new format)
+              if (msg.uiMessageParts && msg.uiMessageParts.length > 0) {
+                console.log(`🔄 Using native UIMessage parts for message ${msg.id}:`, {
+                  partsCount: msg.uiMessageParts.length,
+                  partTypes: msg.uiMessageParts.map(p => p.type)
+                });
+                
+                return {
+                  id: msg.id,
+                  role: msg.role as 'user' | 'assistant' | 'system',
+                  parts: msg.uiMessageParts,
+                };
+              }
+
+              // Backwards compatibility: Convert old format to UIMessage parts
+              console.log(`🔄 Converting legacy format for message ${msg.id}`);
+              
               // Handle case where content might be a JSON string containing the full message
               let textContent = msg.content;
               try {
@@ -71,17 +88,76 @@ export const AgentChatProvider = ({ config, conversationId, children }: AgentCha
                 // If it's not JSON, use as-is
                 textContent = msg.content;
               }
+
+              // Build parts array using AI SDK's native format
+              const parts: any[] = [];
+              
+              // Add text content first if present
+              if (textContent && textContent.trim()) {
+                parts.push({ 
+                  type: 'text', 
+                  text: textContent,
+                  state: 'done'
+                });
+              }
+
+              // Add tool parts using AI SDK's native ToolUIPart format
+              if (msg.toolCalls && msg.toolCalls.length > 0) {
+                for (const toolCall of msg.toolCalls) {
+                  // Find corresponding tool result
+                  const correspondingResult = msg.toolResults?.find(
+                    result => result.toolCallId === toolCall.toolCallId
+                  );
+                  
+                  // Create native AI SDK tool part
+                  const toolPart: any = {
+                    type: `tool-${toolCall.toolName}`,
+                    toolCallId: toolCall.toolCallId,
+                    input: toolCall.input,
+                  };
+
+                  // Set state and output based on whether we have a result
+                  if (correspondingResult) {
+                    if (correspondingResult.isError) {
+                      toolPart.state = 'output-error';
+                      toolPart.errorText = correspondingResult.error || 'Tool execution failed';
+                    } else {
+                      toolPart.state = 'output-available';
+                      toolPart.output = correspondingResult.output;
+                    }
+                  } else {
+                    toolPart.state = 'input-available';
+                  }
+                  
+                  parts.push(toolPart);
+                }
+              }
               
               return {
                 id: msg.id,
                 role: msg.role as 'user' | 'assistant' | 'system',
-                parts: [{ type: 'text', text: textContent }],
+                parts: parts.length > 0 ? parts : [{ type: 'text', text: textContent || '', state: 'done' }],
               };
             });
             
             if (!cancelled) {
               setInitialMessages(aiMessages);
               console.log(`✅ Restored ${aiMessages.length} messages for conversation ${conversationId}`);
+              console.log('🔄 Restored messages details:', aiMessages.map(msg => ({
+                id: msg.id,
+                role: msg.role,
+                partsCount: msg.parts.length,
+                partTypes: msg.parts.map(p => p.type),
+                hasToolParts: msg.parts.some(p => p.type.startsWith('tool-')),
+                toolParts: msg.parts
+                  .filter(p => p.type.startsWith('tool-'))
+                  .map(p => ({ 
+                    type: p.type, 
+                    state: (p as any).state,
+                    hasOutput: !!(p as any).output,
+                    hasInput: !!(p as any).input
+                  }))
+              })));
             }
           }
         } else if (response.status === 404) {

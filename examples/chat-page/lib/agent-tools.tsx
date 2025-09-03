@@ -10,7 +10,7 @@ export function ToolRenderer({ toolCall, toolResult }: { toolCall: ToolCall, too
     if (isTimeout) return 'Timed out';
     if (isRetryExhausted) return 'Failed after retries';
     if (hasError) return 'Error';
-    if (toolResult && !hasError && (toolResult.output || toolResult.result)) return 'Completed';
+    if (toolResult && !hasError && toolResult.output) return 'Completed';
     return 'Running';
   };
 

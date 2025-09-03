@@ -12,7 +12,6 @@ export interface ToolResult {
   toolCallId: string;
   toolName: string;
   output?: any;
-  result?: any;
   error?: string;
   isError?: boolean;
 }
@@ -24,6 +23,7 @@ export interface ChatMessage {
   timestamp: Date;
   toolCalls?: ToolCall[];
   toolResults?: ToolResult[];
+  uiMessageParts?: any[]; // Native AI SDK UIMessagePart format
 }
 
 export interface Conversation {
@@ -126,12 +126,26 @@ export interface ToolsObject {
 }
 
 
+// Helper to safely check if we're in development mode
+function isDevMode(): boolean {
+  try {
+    // Check for environment variables in various ways
+    const nodeEnv = (globalThis as any).process?.env?.NODE_ENV || 
+                    (globalThis as any).__NODE_ENV__ || 
+                    (globalThis as any).__DEV__;
+    return nodeEnv === 'development' || nodeEnv === true;
+  } catch {
+    return false;
+  }
+}
+
 export interface AgentChatConfig {
   tools: Record<string, { display_name: string; renderKey?: string }>;
   route: string;
   historyRoute?: string;
   toolRenderers?: Record<string, React.ComponentType<{ toolCall: ToolCall; toolResult?: ToolResult }>>;
   toolExecution?: ToolExecutionConfig;
+  showDebugPanel?: boolean; // Show debug panel (defaults to NODE_ENV === 'development')
 }
 
 export interface ModelConfig<TTools extends Record<string, any>> {
@@ -155,12 +169,19 @@ const DEFAULT_TOOL_EXECUTION_CONFIG: ToolExecutionConfig = {
   retryDelayMs: 1000, // 1 second initial delay
 };
 
-export function makeAgentChatClientConfig<TTools extends ToolsObject>(
-  route: string,
-  tools: TTools,
-  toolExecutionConfig?: Partial<ToolExecutionConfig>,
-  historyRoute?: string
-): AgentChatConfig {
+export function makeAgentChatClientConfig<TTools extends ToolsObject>({
+  route,
+  tools,
+  toolExecutionConfig,
+  historyRoute,
+  showDebugPanel
+}: {
+  route: string;
+  tools: TTools;
+  toolExecutionConfig?: Partial<ToolExecutionConfig>;
+  historyRoute?: string;
+  showDebugPanel?: boolean;
+}): AgentChatConfig {
   const finalExecutionConfig = { ...DEFAULT_TOOL_EXECUTION_CONFIG, ...toolExecutionConfig };
   
   const toolsMap = Object.keys(tools).reduce((acc: Record<string, any>, toolName: string) => ({
@@ -175,18 +196,26 @@ export function makeAgentChatClientConfig<TTools extends ToolsObject>(
     route,
     historyRoute: historyRoute || `${route}/history`,
     toolExecution: finalExecutionConfig,
+    showDebugPanel: showDebugPanel ?? isDevMode(), // Default to development mode detection
     // toolRenderers should be added separately on client-side
   };
 }
 
-export function makeAgentChatRouteConfig<TTools extends ToolsObject>(
-  system_prompt: string,
-  tools: TTools,
-  auth_func: () => Promise<boolean>,
-  toolExecutionConfig?: Partial<ToolExecutionConfig>,
-  modelConfig?: ModelConfig<TTools>,
-  storage?: ChatStorage
-): AgentChatRouteConfig<TTools> {
+export function makeAgentChatRouteConfig<TTools extends ToolsObject>({
+  system_prompt,
+  tools,
+  auth_func,
+  toolExecutionConfig,
+  modelConfig,
+  storage
+}: {
+  system_prompt: string;
+  tools: TTools;
+  auth_func: () => Promise<boolean>;
+  toolExecutionConfig?: Partial<ToolExecutionConfig>;
+  modelConfig?: ModelConfig<TTools>;
+  storage?: ChatStorage;
+}): AgentChatRouteConfig<TTools> {
   const finalExecutionConfig = { ...DEFAULT_TOOL_EXECUTION_CONFIG, ...toolExecutionConfig };
   
   // Wrap tools with timeout/retry logic
@@ -204,18 +233,29 @@ export function makeAgentChatRouteConfig<TTools extends ToolsObject>(
   };
 }
 
-export function makeAgentChatConfig<TTools extends ToolsObject>(
-  system_prompt: string,
-  route: string,
-  tools: TTools,
-  auth_func: () => Promise<boolean>,
-  toolExecutionConfig?: Partial<ToolExecutionConfig>,
-  modelConfig?: ModelConfig<TTools>,
-  storage?: ChatStorage,
-  historyRoute?: string
-): { agentChatConfig: AgentChatConfig; agentChatRouteConfig: AgentChatRouteConfig<TTools> } {
+export function makeAgentChatConfig<TTools extends ToolsObject>({
+  system_prompt,
+  route,
+  tools,
+  auth_func,
+  toolExecutionConfig,
+  modelConfig,
+  storage,
+  historyRoute,
+  showDebugPanel
+}: {
+  system_prompt: string;
+  route: string;
+  tools: TTools;
+  auth_func: () => Promise<boolean>;
+  toolExecutionConfig?: Partial<ToolExecutionConfig>;
+  modelConfig?: ModelConfig<TTools>;
+  storage?: ChatStorage;
+  historyRoute?: string;
+  showDebugPanel?: boolean;
+}): { agentChatConfig: AgentChatConfig; agentChatRouteConfig: AgentChatRouteConfig<TTools> } {
   return {
-    agentChatConfig: makeAgentChatClientConfig(route, tools, toolExecutionConfig, historyRoute),
-    agentChatRouteConfig: makeAgentChatRouteConfig(system_prompt, tools, auth_func, toolExecutionConfig, modelConfig, storage)
+    agentChatConfig: makeAgentChatClientConfig({ route, tools, toolExecutionConfig, historyRoute, showDebugPanel }),
+    agentChatRouteConfig: makeAgentChatRouteConfig({ system_prompt, tools, auth_func, toolExecutionConfig, modelConfig, storage })
   };
 }

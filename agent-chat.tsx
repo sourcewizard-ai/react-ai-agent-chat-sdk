@@ -13,7 +13,7 @@ export const AgentChat = ({ config, conversationId }: { config: AgentChatConfig;
       <ChatLayout>
         <ChatMessagesContainer>
           <ChatMessages />
-          <DebugPanel />
+          {config.showDebugPanel && <DebugPanel />}
         </ChatMessagesContainer>
         <ChatInput />
       </ChatLayout>
@@ -22,7 +22,7 @@ export const AgentChat = ({ config, conversationId }: { config: AgentChatConfig;
 };
 
 const ChatMessages = () => {
-  const { chatHelpers, isLoadingHistory, conversationId } = useChatState();
+  const { chatHelpers, isLoadingHistory, conversationId, config } = useChatState();
   
   if (isLoadingHistory) {
     return (

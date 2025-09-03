@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev --turbopack",
+    "dev": "npx tsx /home/ivan/root/data/dev/sourcewizard-web/sourcewizard/cli/index.ts build ../../ && next dev --turbopack",
     "build": "next build --turbopack",
     "start": "next start",
     "lint": "eslint"

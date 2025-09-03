@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { makeAgentChatConfig, createTool } from 'react-ai-agent-chat-sdk/config';
 import { ToolRenderer } from './agent-tools';
-import { MemoryStorage } from './memory-storage';
+import { MemoryStorage } from 'react-ai-agent-chat-sdk/storage';
 
 // Mock file system - in memory storage
 const mockFileSystem = new Map<string, string>();
@@ -129,23 +129,21 @@ export const tools = {
 // Create storage instance - use in-memory storage for server side
 const storage = new MemoryStorage();
 
-const { agentChatConfig: baseAgentChatConfig, agentChatRouteConfig } = makeAgentChatConfig(
-  `You are a helpful assistant with access to file management tools.
+const { agentChatConfig: baseAgentChatConfig, agentChatRouteConfig } = makeAgentChatConfig({
+  system_prompt: `You are a helpful assistant with access to file management tools.
 When displaying file contents, ALWAYS wrap them in triple backticks(\`\`\`) to show them
 as code blocks, preserving the original formatting.
 Do not render markdown files as HTML - show the raw markdown content in code blocks.
 When a user asks about files, first list the files, then read the specific file they want,
 and finally provide a complete response with the file contents in code blocks.
 ALWAYS provide a text response after using tools - never stop with just tool calls.`,
-  "/api/chat",
+  route: "/api/chat",
   tools,
-  async (): Promise<boolean> => {
+  auth_func: async (): Promise<boolean> => {
     return true;
   },
-  undefined, // toolExecutionConfig
-  undefined, // modelConfig
-  storage     // storage
-)
+  storage,
+})
 
 // Export config without tool renderers to avoid serialization issues
 export const agentChatConfig = baseAgentChatConfig;
