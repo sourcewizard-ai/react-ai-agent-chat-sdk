@@ -1,0 +1,35 @@
+{
+  "name": "vite-express-split-example",
+  "version": "1.0.0",
+  "description": "React AI Agent Chat SDK example with separate Vite frontend and Express backend",
+  "private": true,
+  "scripts": {
+    "dev": "concurrently -k \"pnpm run backend:dev\" \"pnpm run frontend:dev\"",
+    "start": "concurrently \"pnpm run backend:start\" \"pnpm run frontend:preview\"",
+    "backend:dev": "cd backend && pnpm run dev",
+    "backend:start": "cd backend && pnpm start",
+    "frontend:dev": "cd frontend && pnpm run dev",
+    "frontend:build": "cd frontend && pnpm run build",
+    "frontend:preview": "cd frontend && pnpm run preview",
+    "install:all": "pnpm install && cd backend && pnpm install && cd ../frontend && pnpm install",
+    "build": "pnpm run frontend:build",
+    "clean": "cd backend && rm -rf node_modules && cd ../frontend && rm -rf node_modules && rm -rf node_modules"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "packageManager": "pnpm@9.0.0",
+  "keywords": [
+    "react",
+    "ai",
+    "chat",
+    "anthropic",
+    "claude",
+    "vite",
+    "express",
+    "fullstack"
+  ]
+}

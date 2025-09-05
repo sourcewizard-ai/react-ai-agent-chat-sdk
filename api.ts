@@ -191,3 +191,67 @@ export async function chatHistoryRoute<TTools extends Record<string, any>>(confi
     return new Response('Bad Request', { status: 400 });
   }
 }
+
+// Express.js route handler
+export function AgentChatRoute<TTools extends Record<string, any>>(config: AgentChatRouteConfig<TTools>) {
+  return async (req: any, res: any) => {
+    try {
+      if (req.method === 'POST') {
+        // Main chat endpoint
+        const webRequest = new Request(`http://localhost${req.url}`, {
+          method: 'POST',
+          headers: req.headers,
+          body: JSON.stringify(req.body),
+        });
+        
+        const response = await chatRoute(config, webRequest);
+        
+        // Copy response headers
+        response.headers.forEach((value, key) => {
+          res.setHeader(key, value);
+        });
+        
+        res.status(response.status);
+        
+        if (response.body) {
+          // Stream the response
+          const reader = response.body.getReader();
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            res.write(value);
+          }
+        }
+        
+        res.end();
+      } else if (req.method === 'GET' && req.url.includes('/history')) {
+        // History endpoint
+        const webRequest = new Request(`http://localhost${req.url}`, {
+          method: 'GET',
+          headers: req.headers,
+        });
+        
+        const response = await chatHistoryRoute(config, webRequest);
+        
+        // Copy response headers
+        response.headers.forEach((value, key) => {
+          res.setHeader(key, value);
+        });
+        
+        res.status(response.status);
+        
+        if (response.body) {
+          const text = await response.text();
+          res.send(text);
+        } else {
+          res.end();
+        }
+      } else {
+        res.status(405).json({ error: 'Method not allowed' });
+      }
+    } catch (error) {
+      console.error('❌ ERROR in AgentChatRoute:', error);
+      res.status(500).json({ error: 'Internal Server Error' });
+    }
+  };
+}

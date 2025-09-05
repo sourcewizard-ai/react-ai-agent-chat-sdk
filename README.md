@@ -32,7 +32,7 @@ Create tools with Zod schemas for type-safe input validation:
 
 ```typescript
 import { z } from 'zod';
-import { createTool } from 'react-ai-agent-chat-sdk/config';
+import { createTool } from 'react-ai-agent-chat-sdk/config-server';
 
 const readFileSchema = z.object({
   file_path: z.string().describe('The path to the file to read'),
@@ -51,19 +51,20 @@ const tools = {
 };
 ```
 
-### 3. Define Configuration
+### 3. Define Server Configuration
 
-Create both client and server configurations:
+Create server configuration for API routes and tool execution:
 
 ```typescript
-import { makeAgentChatConfig } from 'react-ai-agent-chat-sdk/config';
+import { makeAgentChatRouteConfig } from 'react-ai-agent-chat-sdk/config-server';
 import { anthropic } from '@ai-sdk/anthropic';
+import { MemoryStorage } from 'react-ai-agent-chat-sdk/storage';
 
-const { agentChatConfig, agentChatRouteConfig } = makeAgentChatConfig({
+const agentChatRouteConfig = makeAgentChatRouteConfig({
   system_prompt: `You are a helpful assistant with access to file management tools.`,
-  route: "/api/chat",
   tools,
   auth_func: async () => true, // Replace with your auth logic
+  storage: new MemoryStorage(), // Use your preferred storage
   modelConfig: {
     model: anthropic('claude-sonnet-4-20250514'),
     temperature: 0.3
@@ -71,11 +72,32 @@ const { agentChatConfig, agentChatRouteConfig } = makeAgentChatConfig({
 });
 ```
 
-### 4. Add Chat and History Routes
+### 4. Define Client Configuration
+
+Create client configuration for the React UI:
+
+```typescript
+import { makeAgentChatClientConfig } from 'react-ai-agent-chat-sdk/config-client';
+
+const agentChatClientConfig = makeAgentChatClientConfig({
+  tools: {
+    read_file: {
+      display_name: "Reading file"
+    }
+  },
+  route: "/api/chat", // Your chat API endpoint
+  // Optional: custom tool renderers
+  toolRenderers: {
+    read_file: CustomFileRenderer
+  }
+});
+```
+
+### 5. Add Chat and History Routes
 
 Create API routes for chat and history:
 
-**Chat Route (`app/api/chat/route.ts`):**
+**For Next.js App Router (`app/api/chat/route.ts`):**
 ```typescript
 import { chatRoute } from 'react-ai-agent-chat-sdk/api';
 import { agentChatRouteConfig } from '@/lib/agent-config';
@@ -95,7 +117,24 @@ export async function GET(req: Request) {
 }
 ```
 
-### 5. Add AgentChat UI Element
+**For Express.js (`server.js`):**
+```javascript
+import { AgentChatRoute } from 'react-ai-agent-chat-sdk/api';
+import { agentChatRouteConfig } from './lib/agent-config.js';
+
+const app = express();
+
+// Chat endpoint
+app.post('/api/chat', AgentChatRoute(agentChatRouteConfig));
+
+// History endpoint  
+app.get('/api/chat/history', AgentChatRoute({
+  ...agentChatRouteConfig,
+  method: 'GET'
+}));
+```
+
+### 6. Add AgentChat UI Element
 
 Use the chat component in your React app:
 
@@ -105,7 +144,7 @@ Use the chat component in your React app:
 import { useEffect, useState } from 'react';
 import { AgentChat } from 'react-ai-agent-chat-sdk';
 import 'react-ai-agent-chat-sdk/agent-chat.css';
-import { agentChatConfig } from '@/lib/agent-config';
+import { agentChatClientConfig } from '@/lib/agent-chat-client-config';
 
 export default function ChatPage() {
   const [conversationId, setConversationId] = useState<string>('');
@@ -126,12 +165,20 @@ export default function ChatPage() {
   
   return (
     <AgentChat 
-      config={agentChatConfig} 
+      config={agentChatClientConfig} 
       conversationId={conversationId} 
     />
   );
 }
 ```
+
+## Architecture Overview
+
+The SDK now uses a **frontend/backend separation** architecture:
+
+- **Backend Configuration** (`config-server`): Handles tool execution, AI model configuration, authentication, and storage. Used in API routes.
+- **Frontend Configuration** (`config-client`): Handles UI rendering, tool display names, and custom renderers. Used in React components.
+- **Shared Types**: Both configurations share the same tool definitions and conversation structure.
 
 ## Customization
 
@@ -171,17 +218,20 @@ Add renderers to your configuration:
 
 ```typescript
 // lib/agent-chat-client-config.ts
-import { AgentChatConfig } from 'react-ai-agent-chat-sdk/config';
+import { makeAgentChatClientConfig } from 'react-ai-agent-chat-sdk/config-client';
 import { CustomFileRenderer } from './renderers';
 
-export function createClientConfig(config: AgentChatConfig): AgentChatConfig {
-  return {
-    ...config,
-    toolRenderers: {
-      read_file: CustomFileRenderer,
+export const agentChatClientConfig = makeAgentChatClientConfig({
+  tools: {
+    read_file: {
+      display_name: "Reading file"
     }
-  };
-}
+  },
+  route: "/api/chat",
+  toolRenderers: {
+    read_file: CustomFileRenderer,
+  }
+});
 ```
 
 ### Route Parameters
@@ -189,11 +239,20 @@ export function createClientConfig(config: AgentChatConfig): AgentChatConfig {
 Customize API endpoints to fit your application structure:
 
 ```typescript
-const { agentChatConfig, agentChatRouteConfig } = makeAgentChatConfig({
+// Server config
+const agentChatRouteConfig = makeAgentChatRouteConfig({
   system_prompt: "You are a helpful assistant.",
-  route: "/api/v1/chat", // Custom chat route
   tools,
   auth_func: async () => true,
+  storage: new MemoryStorage()
+});
+
+// Client config
+const agentChatClientConfig = makeAgentChatClientConfig({
+  tools: {
+    // Tool definitions for display
+  },
+  route: "/api/v1/chat", // Custom chat route
   historyRoute: "/api/v1/history" // Custom history route (optional)
 });
 ```
@@ -204,11 +263,11 @@ Configure timeouts and retries globally and per-tool:
 
 **Global Configuration:**
 ```typescript
-const { agentChatConfig, agentChatRouteConfig } = makeAgentChatConfig({
+const agentChatRouteConfig = makeAgentChatRouteConfig({
   system_prompt: "You are a helpful assistant.",
-  route: "/api/chat",
   tools,
   auth_func: async () => true,
+  storage: new MemoryStorage(),
   toolExecutionConfig: {
     timeoutMs: 30000, // 30 seconds default
     retries: 3,
@@ -254,9 +313,8 @@ class MyStorage implements ChatStorage {
   }
 }
 
-const { agentChatConfig, agentChatRouteConfig } = makeAgentChatConfig({
+const agentChatRouteConfig = makeAgentChatRouteConfig({
   system_prompt: "You are a helpful assistant.",
-  route: "/api/chat",
   tools,
   auth_func: async () => true,
   storage // Add storage for conversation persistence
@@ -268,11 +326,11 @@ const { agentChatConfig, agentChatRouteConfig } = makeAgentChatConfig({
 import { openai } from '@ai-sdk/openai';
 import { messageCountIs } from 'ai';
 
-const { agentChatConfig, agentChatRouteConfig } = makeAgentChatConfig({
+const agentChatRouteConfig = makeAgentChatRouteConfig({
   system_prompt: "You are a helpful assistant.",
-  route: "/api/chat",
   tools,
   auth_func: async () => true,
+  storage: new MemoryStorage(),
   modelConfig: {
     model: openai('gpt-4o'), // Use different AI models
     temperature: 0.7,

@@ -1,11 +1,16 @@
 {
   "name": "react-ai-agent-chat-sdk",
-  "version": "0.1.1",
+  "version": "0.2.0",
   "description": "A React library for building AI-powered chat interfaces with tool execution, configurable timeouts, retry logic, and custom renderers",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "license": "MIT",
   "author": "SourceWizard",
+  "type": "module",
+  "module": "./dist/index.js",
+  "engines": {
+    "node": ">=16.0.0"
+  },
   "repository": {
     "type": "git",
     "url": "https://github.com/sourcewizard-ai/react-ai-agent-chat-sdk"
@@ -36,18 +41,32 @@
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
       "default": "./dist/index.js"
     },
     "./config": {
       "types": "./dist/config.d.ts",
+      "import": "./dist/config.js",
       "default": "./dist/config.js"
+    },
+    "./config-server": {
+      "types": "./dist/config-server.d.ts",
+      "import": "./dist/config-server.js",
+      "default": "./dist/config-server.js"
+    },
+    "./config-client": {
+      "types": "./dist/config-client.d.ts",
+      "import": "./dist/config-client.js",
+      "default": "./dist/config-client.js"
     },
     "./api": {
       "types": "./dist/api.d.ts",
+      "import": "./dist/api.js",
       "default": "./dist/api.js"
     },
     "./storage": {
       "types": "./dist/storage.d.ts",
+      "import": "./dist/storage.js",
       "default": "./dist/storage.js"
     },
     "./agent-chat.css": "./agent-chat.css"

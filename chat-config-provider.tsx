@@ -21,6 +21,7 @@ interface AgentChatState {
   setCurrentTool: (currentTool: string | null) => void;
   handleSubmit: (e: React.FormEvent) => void;
   isLoadingHistory: boolean;
+  restoredMessages: UIMessage[];
 }
 
 const AgentChatContext = createContext<AgentChatState | null>(null);
@@ -34,6 +35,7 @@ interface AgentChatProviderProps {
 export const AgentChatProvider = ({ config, conversationId, children }: AgentChatProviderProps) => {
   const [initialMessages, setInitialMessages] = useState<UIMessage[]>([]);
   const [isLoadingHistory, setIsLoadingHistory] = useState(true);
+  const [chatKey, setChatKey] = useState(0);
 
   // Load conversation history when conversation ID is available
   useEffect(() => {
@@ -60,7 +62,7 @@ export const AgentChatProvider = ({ config, conversationId, children }: AgentCha
                   partsCount: msg.uiMessageParts.length,
                   partTypes: msg.uiMessageParts.map(p => p.type)
                 });
-                
+
                 return {
                   id: msg.id,
                   role: msg.role as 'user' | 'assistant' | 'system',
@@ -70,7 +72,7 @@ export const AgentChatProvider = ({ config, conversationId, children }: AgentCha
 
               // Backwards compatibility: Convert old format to UIMessage parts
               console.log(`🔄 Converting legacy format for message ${msg.id}`);
-              
+
               // Handle case where content might be a JSON string containing the full message
               let textContent = msg.content;
               try {
@@ -91,11 +93,11 @@ export const AgentChatProvider = ({ config, conversationId, children }: AgentCha
 
               // Build parts array using AI SDK's native format
               const parts: any[] = [];
-              
+
               // Add text content first if present
               if (textContent && textContent.trim()) {
-                parts.push({ 
-                  type: 'text', 
+                parts.push({
+                  type: 'text',
                   text: textContent,
                   state: 'done'
                 });
@@ -108,7 +110,7 @@ export const AgentChatProvider = ({ config, conversationId, children }: AgentCha
                   const correspondingResult = msg.toolResults?.find(
                     result => result.toolCallId === toolCall.toolCallId
                   );
-                  
+
                   // Create native AI SDK tool part
                   const toolPart: any = {
                     type: `tool-${toolCall.toolName}`,
@@ -128,20 +130,21 @@ export const AgentChatProvider = ({ config, conversationId, children }: AgentCha
                   } else {
                     toolPart.state = 'input-available';
                   }
-                  
+
                   parts.push(toolPart);
                 }
               }
-              
+
               return {
                 id: msg.id,
                 role: msg.role as 'user' | 'assistant' | 'system',
                 parts: parts.length > 0 ? parts : [{ type: 'text', text: textContent || '', state: 'done' }],
               };
             });
-            
+
             if (!cancelled) {
               setInitialMessages(aiMessages);
+              setChatKey(prev => prev + 1); // Force useChat to reinitialize
               console.log(`✅ Restored ${aiMessages.length} messages for conversation ${conversationId}`);
               console.log('🔄 Restored messages details:', aiMessages.map(msg => ({
                 id: msg.id,
@@ -151,8 +154,8 @@ export const AgentChatProvider = ({ config, conversationId, children }: AgentCha
                 hasToolParts: msg.parts.some(p => p.type.startsWith('tool-')),
                 toolParts: msg.parts
                   .filter(p => p.type.startsWith('tool-'))
-                  .map(p => ({ 
-                    type: p.type, 
+                  .map(p => ({
+                    type: p.type,
                     state: (p as any).state,
                     hasOutput: !!(p as any).output,
                     hasInput: !!(p as any).input
@@ -191,7 +194,7 @@ export const AgentChatProvider = ({ config, conversationId, children }: AgentCha
       api: config.route,
       prepareSendMessagesRequest: (options) => {
         console.log('🌐 [Client] prepareSendMessagesRequest: using conversationId =', conversationId);
-        
+
         // Build the complete request body with all required fields
         const requestBody = {
           id: options.id,
@@ -201,29 +204,26 @@ export const AgentChatProvider = ({ config, conversationId, children }: AgentCha
           ...options.body, // Include any additional body fields
           conversation_id: conversationId, // Add our custom field
         };
-        
+
         console.log('🌐 [Client] Final request body with conversation_id:', conversationId);
-        
+
         return {
           body: requestBody,
         };
       },
     });
-  }, [conversationId, config.route]);
+  }, [config.route]); // Remove conversationId dependency since it's captured in closure
 
   const chatOptions = useMemo(() => {
-    // Create a unique ID based on whether we have messages or not
-    // This forces useChat to recreate when messages are loaded
-    const chatId = initialMessages.length > 0 ? `${conversationId}-with-history` : `${conversationId}-empty`;
     return {
-      id: chatId,
+      id: conversationId,
       messages: initialMessages,
       transport,
     };
-  }, [initialMessages, transport, conversationId]);
+  }, [initialMessages, transport, chatKey]);
 
   const chatHelpers = useChat(chatOptions);
-  
+
   const [input, setInput] = useState('');
   const [isThinking, setIsThinking] = useState(false);
   const [isProcessingTools, setIsProcessingTools] = useState(false);
@@ -232,67 +232,63 @@ export const AgentChatProvider = ({ config, conversationId, children }: AgentCha
   useEffect(() => {
     // Register tool renderers passed from client-side config
     if (config.toolRenderers) {
-      Object.keys(config.toolRenderers).forEach(toolName => {
-        registerToolRenderer(toolName, config.toolRenderers![toolName]);
+      Object.entries(config.toolRenderers).forEach(([toolName, renderer]) => {
+        registerToolRenderer(toolName, renderer);
       });
     }
-  }, [config.toolRenderers]);
+  }, []); // Only run once on mount since config doesn't change
 
   // Monitor messages for completion and tool processing
   useEffect(() => {
     const lastMessage = chatHelpers.messages[chatHelpers.messages.length - 1];
-
-    // Reset states based on chat status
     const isLoading = chatHelpers.status !== 'ready';
-    if (isLoading) {
-      // Chat is active, check what's happening
-      if (lastMessage && lastMessage.role === 'assistant') {
-        // Check if this message contains tool calls
-        const toolParts = lastMessage.parts.filter((part: any) => part.type.startsWith('tool-'));
-        const hasToolCalls = toolParts.length > 0;
-        const hasTextParts = lastMessage.parts.some((part: any) => part.type === 'text');
 
-        if (hasToolCalls && !hasTextParts) {
-          // Only tool calls, no text yet - processing tools
-          const latestToolPart = toolParts[toolParts.length - 1];
-          if (latestToolPart) {
-            const toolName = latestToolPart.type.replace('tool-', '');
-            setCurrentTool(toolName);
-            setIsProcessingTools(true);
-            setIsThinking(false);
-          }
-        } else if (hasTextParts) {
-          // Has text response - thinking (generating text)
-          setIsThinking(true);
-          setIsProcessingTools(false);
-          setCurrentTool(null);
+    if (isLoading && lastMessage?.role === 'assistant') {
+      // Check if this message contains tool calls
+      const toolParts = lastMessage.parts.filter((part: any) => part.type.startsWith('tool-'));
+      const hasToolCalls = toolParts.length > 0;
+      const hasTextParts = lastMessage.parts.some((part: any) => part.type === 'text');
+
+      if (hasToolCalls && !hasTextParts) {
+        // Only tool calls, no text yet - processing tools
+        const latestToolPart = toolParts[toolParts.length - 1];
+        if (latestToolPart) {
+          const toolName = latestToolPart.type.replace('tool-', '');
+          setCurrentTool(prev => prev !== toolName ? toolName : prev);
+          setIsProcessingTools(prev => prev !== true ? true : prev);
+          setIsThinking(prev => prev !== false ? false : prev);
         }
-      } else {
-        // No assistant message yet or user message - thinking
-        setIsThinking(true);
-        setIsProcessingTools(false);
-        setCurrentTool(null);
+      } else if (hasTextParts) {
+        // Has text response - thinking (generating text)
+        setIsThinking(prev => prev !== true ? true : prev);
+        setIsProcessingTools(prev => prev !== false ? false : prev);
+        setCurrentTool(prev => prev !== null ? null : prev);
       }
+    } else if (isLoading) {
+      // No assistant message yet or user message - thinking
+      setIsThinking(prev => prev !== true ? true : prev);
+      setIsProcessingTools(prev => prev !== false ? false : prev);
+      setCurrentTool(prev => prev !== null ? null : prev);
     } else {
       // Chat is not loading - conversation finished
-      setIsThinking(false);
-      setIsProcessingTools(false);
-      setCurrentTool(null);
+      setIsThinking(prev => prev !== false ? false : prev);
+      setIsProcessingTools(prev => prev !== false ? false : prev);
+      setCurrentTool(prev => prev !== null ? null : prev);
     }
-  }, [chatHelpers.messages, chatHelpers.status]); // Remove setter dependencies
+  }, [chatHelpers.messages, chatHelpers.status]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (input.trim() && conversationId && !isLoadingHistory) {
-      setIsThinking(true);
+      // Don't manually set isThinking - let the effect handle it
       try {
         chatHelpers.sendMessage({
           text: input,
         });
+        setInput('');
       } catch (error) {
         console.error('ERROR calling append:', error);
       }
-      setInput('');
     }
   };
 
@@ -310,6 +306,7 @@ export const AgentChatProvider = ({ config, conversationId, children }: AgentCha
     setCurrentTool,
     handleSubmit,
     isLoadingHistory,
+    restoredMessages: initialMessages,
   };
 
   // Show loading state while history is being loaded

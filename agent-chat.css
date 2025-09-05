@@ -41,7 +41,8 @@
 }
 
 .chat-message-assistant {
-  background-color: #f3f4f6; /* bg-gray-100 */
+  background-color: #1f2937; /* dark:bg-gray-800 */
+  color: #ededed; /* light text on dark background */
   margin-right: auto;
   max-width: 28rem;
 }
@@ -56,16 +57,11 @@
   margin-top: 0.5rem;
 }
 
-/* Dark mode */
-@media (prefers-color-scheme: dark) {
-  .chat-message-assistant {
-    background-color: #1f2937; /* dark:bg-gray-800 */
-  }
-}
 
 /* Thinking Bubble */
 .thinking-bubble {
   background-color: #f3f4f6; /* bg-gray-100 */
+  color: #171717; /* dark text on light background */
   margin-right: auto;
   max-width: 20rem;
   padding: 0.75rem;

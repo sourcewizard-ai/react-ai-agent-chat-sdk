@@ -19,3 +19,6 @@ export type { AgentChatConfig, AgentChatRouteConfig } from './config';
 
 // Tool registry (for advanced usage)
 export { registerToolRenderer, getToolRenderer, hasCustomRenderer } from './tool-renderer-registry';
+
+// API route handlers
+export { AgentChatRoute, chatRoute, chatHistoryRoute } from './api';

@@ -1,13 +1,11 @@
-'use client';
-
 import { useEffect, useState } from 'react';
 import { AgentChat } from 'react-ai-agent-chat-sdk';
 import 'react-ai-agent-chat-sdk/agent-chat.css';
-import { agentChatClientConfig } from '@/lib/agent-chat-client-config';
-import { ChatDebugPanel } from '@/lib/chat-debug-panel';
+import { agentChatClientConfig } from './lib/agent-chat-client-config';
+import { ChatDebugPanel } from './lib/chat-debug-panel';
 
-export default function Home() {
-  const [conversationId, setConversationId] = useState<string>('');
+export default function App() {
+  const [conversationId, setConversationId] = useState('');
   
   useEffect(() => {
     // Load or create conversation ID on client side
@@ -23,7 +21,7 @@ export default function Home() {
   // Don't render chat until conversation ID is loaded
   if (!conversationId) {
     return (
-      <div className="flex items-center justify-center h-screen text-gray-500">
+      <div className="flex items-center justify-center h-screen text-gray-400 bg-gray-900">
         <div className="flex items-center space-x-2">
           <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-gray-400"></div>
           <span className="text-sm">Initializing...</span>
@@ -33,7 +31,7 @@ export default function Home() {
   }
   
   return (
-    <div className="flex flex-col h-screen">
+    <div className="flex flex-col h-screen bg-gray-900">
       <div className="flex-1">
         <AgentChat config={agentChatClientConfig} conversationId={conversationId} />
       </div>

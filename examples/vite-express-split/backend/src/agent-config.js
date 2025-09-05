@@ -1,11 +1,9 @@
 import { z } from 'zod';
 import { makeAgentChatRouteConfig, createTool } from 'react-ai-agent-chat-sdk/config-server';
-import { makeAgentChatClientConfig } from 'react-ai-agent-chat-sdk/config-client';
-import { ToolRenderer } from './agent-tools';
 import { MemoryStorage } from 'react-ai-agent-chat-sdk/storage';
 
 // Mock file system - in memory storage
-const mockFileSystem = new Map<string, string>();
+const mockFileSystem = new Map();
 
 // Initialize with some sample files
 mockFileSystem.set('README.md', `# My Project
@@ -44,8 +42,8 @@ const editFileSchema = z.object({
 
 const listFilesSchema = z.object({});
 
-// Define tool execution functions separately
-const executeReadFile = async ({ file_path }: z.infer<typeof readFileSchema>) => {
+// Define tool execution functions
+const executeReadFile = async ({ file_path }) => {
   console.log('🔧 TOOL EXECUTED: read_file with path:', file_path);
   const content = mockFileSystem.get(file_path);
   if (content === undefined) {
@@ -61,11 +59,10 @@ const executeReadFile = async ({ file_path }: z.infer<typeof readFileSchema>) =>
     content,
   };
   console.log('🔧 TOOL RESULT:', result);
-  //await new Promise(resolve => setTimeout(resolve, 10000));
   return result;
 };
 
-const executeEditFile = async ({ file_path, content }: z.infer<typeof editFileSchema>) => {
+const executeEditFile = async ({ file_path, content }) => {
   console.log('🔧 TOOL EXECUTED: edit_file with path:', file_path, 'content length:', content.length);
   mockFileSystem.set(file_path, content);
   const result = {
@@ -77,15 +74,13 @@ const executeEditFile = async ({ file_path, content }: z.infer<typeof editFileSc
   return result;
 };
 
-const executeListFiles = async ({ }: z.infer<typeof listFilesSchema>) => {
-  console.log('🔧 TOOL EXECUTED: list_files - starting 10 second delay');
-
+const executeListFiles = async () => {
+  console.log('🔧 TOOL EXECUTED: list_files');
   try {
     const result = {
       files: Array.from(mockFileSystem.keys()),
       count: mockFileSystem.size,
     };
-    //await new Promise(resolve => setTimeout(resolve, 10000));
     console.log('🔧 TOOL RESULT:', result);
     return result;
   } catch (error) {
@@ -102,9 +97,9 @@ export const tools = {
     inputSchema: readFileSchema,
     execute: executeReadFile,
     executionConfig: {
-      timeoutMs: 5000, // 15 seconds (shorter than default 30s)
-      retries: 1, // Only 1 retry (instead of default 3)
-      retryDelayMs: 2000, // 2 second delay (instead of default 1s)
+      timeoutMs: 5000,
+      retries: 1,
+      retryDelayMs: 2000,
     },
   }),
   edit_file: createTool({
@@ -119,9 +114,9 @@ export const tools = {
     inputSchema: listFilesSchema,
     execute: executeListFiles,
     executionConfig: {
-      timeoutMs: 5000, // 15 seconds (shorter than default 30s)
-      retries: 1, // Only 1 retry (instead of default 3)
-      retryDelayMs: 2000, // 2 second delay (instead of default 1s)
+      timeoutMs: 5000,
+      retries: 1,
+      retryDelayMs: 2000,
     },
   }),
 };
@@ -139,17 +134,8 @@ When a user asks about files, first list the files, then read the specific file 
 and finally provide a complete response with the file contents in code blocks.
 ALWAYS provide a text response after using tools - never stop with just tool calls.`,
   tools,
-  auth_func: async (): Promise<boolean> => {
+  auth_func: async () => {
     return true;
   },
   storage,
 });
-
-// Create client-side config (without render functions to avoid serialization issues)
-export const agentChatClientConfig = makeAgentChatClientConfig({
-  route: "/api/chat",
-  tools,
-});
-
-// For backward compatibility
-export const agentChatConfig = agentChatClientConfig;
