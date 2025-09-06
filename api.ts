@@ -34,7 +34,26 @@ export class ChatRequest {
   }
 }
 
-export async function streamMessage<TTools extends Record<string, any>>(config: AgentChatRouteConfig<TTools>, chatRequest: ChatRequest) {
+function checkCompressionHeaders(req?: Request): Response | null {
+  if (!req) return null;
+  
+  const acceptEncoding = req.headers.get('accept-encoding');
+  const contentEncoding = req.headers.get('content-encoding');
+  
+  if (acceptEncoding?.includes('gzip') || acceptEncoding?.includes('deflate') || acceptEncoding?.includes('br') ||
+      contentEncoding?.includes('gzip') || contentEncoding?.includes('deflate') || contentEncoding?.includes('br')) {
+    return new Response('Compression is not supported for streaming responses', { status: 400 });
+  }
+  
+  return null;
+}
+
+export async function streamMessage<TTools extends Record<string, any>>(config: AgentChatRouteConfig<TTools>, chatRequest: ChatRequest, req?: Request) {
+  const compressionError = checkCompressionHeaders(req);
+  if (compressionError) {
+    return compressionError;
+  }
+
   const is_authenticated = await config.auth_func()
   if (!is_authenticated) {
     console.error('ERROR not authenticated');
@@ -121,7 +140,7 @@ export async function streamMessage<TTools extends Record<string, any>>(config: 
 export async function chatRoute<TTools extends Record<string, any>>(config: AgentChatRouteConfig<TTools>, req: Request) {
   try {
     const chatRequest = await ChatRequest.fromRequest(req);
-    return await streamMessage(config, chatRequest);
+    return await streamMessage(config, chatRequest, req);
   } catch (error) {
     console.error('❌ ERROR parsing request:', error);
     return new Response('Bad Request', { status: 400 });
@@ -197,6 +216,16 @@ export function AgentChatRoute<TTools extends Record<string, any>>(config: Agent
   return async (req: any, res: any) => {
     try {
       if (req.method === 'POST') {
+        // Check for compression in Express.js headers
+        const acceptEncoding = req.headers['accept-encoding'];
+        const contentEncoding = req.headers['content-encoding'];
+        
+        if ((acceptEncoding && (acceptEncoding.includes('gzip') || acceptEncoding.includes('deflate') || acceptEncoding.includes('br'))) ||
+            (contentEncoding && (contentEncoding.includes('gzip') || contentEncoding.includes('deflate') || contentEncoding.includes('br')))) {
+          res.status(400).json({ error: 'Compression is not supported for streaming responses' });
+          return;
+        }
+        
         // Main chat endpoint
         const webRequest = new Request(`http://localhost${req.url}`, {
           method: 'POST',
