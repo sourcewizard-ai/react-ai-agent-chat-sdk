@@ -22,7 +22,7 @@ export const AgentChat = ({ config, conversationId }: { config: AgentChatConfig;
 };
 
 const ChatMessages = () => {
-  const { chatHelpers, isLoadingHistory, conversationId, config, restoredMessages } = useChatState();
+  const { isLoadingHistory, allMessages } = useChatState();
   
   if (isLoadingHistory) {
     return (
@@ -34,14 +34,6 @@ const ChatMessages = () => {
       </div>
     );
   }
-  
-  // Combine restored messages with current chat messages
-  // Filter out restored messages from current chat messages to avoid duplicates
-  const currentMessages = chatHelpers.messages.filter((msg: any) => 
-    !restoredMessages.some(restored => restored.id === msg.id)
-  );
-  
-  const allMessages = [...restoredMessages, ...currentMessages];
   
   return (
     <>

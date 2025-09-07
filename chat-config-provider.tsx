@@ -22,6 +22,7 @@ interface AgentChatState {
   handleSubmit: (e: React.FormEvent) => void;
   isLoadingHistory: boolean;
   restoredMessages: UIMessage[];
+  allMessages: UIMessage[];
 }
 
 const AgentChatContext = createContext<AgentChatState | null>(null);
@@ -292,6 +293,12 @@ export const AgentChatProvider = ({ config, conversationId, children }: AgentCha
     }
   };
 
+  // Combine restored messages with current chat messages
+  const currentMessages = chatHelpers.messages.filter((msg: any) => 
+    !initialMessages.some(restored => restored.id === msg.id)
+  );
+  const allMessages = [...initialMessages, ...currentMessages];
+
   const state: AgentChatState = {
     config,
     chatHelpers,
@@ -307,6 +314,7 @@ export const AgentChatProvider = ({ config, conversationId, children }: AgentCha
     handleSubmit,
     isLoadingHistory,
     restoredMessages: initialMessages,
+    allMessages,
   };
 
   // Show loading state while history is being loaded
