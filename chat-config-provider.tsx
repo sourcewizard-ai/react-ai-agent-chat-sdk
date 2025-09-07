@@ -50,7 +50,9 @@ export const AgentChatProvider = ({ config, conversationId, children }: AgentCha
       try {
         // Call the chat history API endpoint
         const historyRoute = config.historyRoute || `${config.route}/history`;
-        const response = await fetch(`${historyRoute}?conversation_id=${encodeURIComponent(conversationId)}`);
+        const url = new URL(historyRoute, window.location.origin);
+        url.searchParams.set('conversation_id', conversationId);
+        const response = await fetch(url.toString());
 
         if (response.ok) {
           const conversation = await response.json();
@@ -294,7 +296,7 @@ export const AgentChatProvider = ({ config, conversationId, children }: AgentCha
   };
 
   // Combine restored messages with current chat messages
-  const currentMessages = chatHelpers.messages.filter((msg: any) => 
+  const currentMessages = chatHelpers.messages.filter((msg: any) =>
     !initialMessages.some(restored => restored.id === msg.id)
   );
   const allMessages = [...initialMessages, ...currentMessages];
