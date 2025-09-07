@@ -17,11 +17,11 @@ export class ChatRequest {
   constructor(data: unknown) {
     const parsed = chatRequestSchema.parse(data);
     this.messages = parsed.messages;
-    
+
     // Extract conversation_id from multiple possible locations
-    this.conversation_id = parsed.conversation_id || 
-                          parsed.metadata?.conversation_id || 
-                          parsed.data?.conversation_id;
+    this.conversation_id = parsed.conversation_id ||
+      parsed.metadata?.conversation_id ||
+      parsed.data?.conversation_id;
   }
 
   static async fromRequest(req: Request): Promise<ChatRequest> {
@@ -34,32 +34,13 @@ export class ChatRequest {
   }
 }
 
-function checkCompressionHeaders(req?: Request): Response | null {
-  if (!req) return null;
-  
-  const acceptEncoding = req.headers.get('accept-encoding');
-  const contentEncoding = req.headers.get('content-encoding');
-  
-  if (acceptEncoding?.includes('gzip') || acceptEncoding?.includes('deflate') || acceptEncoding?.includes('br') ||
-      contentEncoding?.includes('gzip') || contentEncoding?.includes('deflate') || contentEncoding?.includes('br')) {
-    return new Response('Compression is not supported for streaming responses', { status: 400 });
-  }
-  
-  return null;
-}
-
 export async function streamMessage<TTools extends Record<string, any>>(config: AgentChatRouteConfig<TTools>, chatRequest: ChatRequest, req?: Request) {
-  const compressionError = checkCompressionHeaders(req);
-  if (compressionError) {
-    return compressionError;
-  }
-
   const is_authenticated = await config.auth_func()
   if (!is_authenticated) {
     console.error('ERROR not authenticated');
     return new Response('Unauthorized', { status: 401 });
   }
-  
+
   // Save user message to storage if conversation_id is provided
   if (config.storage && chatRequest.conversation_id && chatRequest.messages.length > 0) {
     try {
@@ -166,7 +147,7 @@ export class HistoryRequest {
 }
 
 export async function getChatHistory<TTools extends Record<string, any>>(
-  config: AgentChatRouteConfig<TTools>, 
+  config: AgentChatRouteConfig<TTools>,
   historyRequest: HistoryRequest
 ): Promise<Response> {
   // Check authentication
@@ -183,7 +164,7 @@ export async function getChatHistory<TTools extends Record<string, any>>(
 
   try {
     const conversation = await config.storage.getConversation(historyRequest.conversation_id);
-    
+
     if (!conversation) {
       return new Response('Conversation not found', { status: 404 });
     }
@@ -216,32 +197,22 @@ export function AgentChatRoute<TTools extends Record<string, any>>(config: Agent
   return async (req: any, res: any) => {
     try {
       if (req.method === 'POST') {
-        // Check for compression in Express.js headers
-        const acceptEncoding = req.headers['accept-encoding'];
-        const contentEncoding = req.headers['content-encoding'];
-        
-        if ((acceptEncoding && (acceptEncoding.includes('gzip') || acceptEncoding.includes('deflate') || acceptEncoding.includes('br'))) ||
-            (contentEncoding && (contentEncoding.includes('gzip') || contentEncoding.includes('deflate') || contentEncoding.includes('br')))) {
-          res.status(400).json({ error: 'Compression is not supported for streaming responses' });
-          return;
-        }
-        
         // Main chat endpoint
         const webRequest = new Request(`http://localhost${req.url}`, {
           method: 'POST',
           headers: req.headers,
           body: JSON.stringify(req.body),
         });
-        
+
         const response = await chatRoute(config, webRequest);
-        
+
         // Copy response headers
         response.headers.forEach((value, key) => {
           res.setHeader(key, value);
         });
-        
+
         res.status(response.status);
-        
+
         if (response.body) {
           // Stream the response
           const reader = response.body.getReader();
@@ -251,7 +222,7 @@ export function AgentChatRoute<TTools extends Record<string, any>>(config: Agent
             res.write(value);
           }
         }
-        
+
         res.end();
       } else if (req.method === 'GET' && req.url.includes('/history')) {
         // History endpoint
@@ -259,16 +230,16 @@ export function AgentChatRoute<TTools extends Record<string, any>>(config: Agent
           method: 'GET',
           headers: req.headers,
         });
-        
+
         const response = await chatHistoryRoute(config, webRequest);
-        
+
         // Copy response headers
         response.headers.forEach((value, key) => {
           res.setHeader(key, value);
         });
-        
+
         res.status(response.status);
-        
+
         if (response.body) {
           const text = await response.text();
           res.send(text);
