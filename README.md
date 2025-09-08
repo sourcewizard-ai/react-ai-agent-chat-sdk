@@ -1,6 +1,7 @@
 # React AI Agent Chat SDK
 
 A React library for building AI-powered chat interfaces with tool execution, configurable timeouts, retry logic, and custom renderers.
+CAUTION NOTE: This library is partially vibe coded, I'll iterate on it to make it more reasonable over time.
 
 ## Quick Start
 
