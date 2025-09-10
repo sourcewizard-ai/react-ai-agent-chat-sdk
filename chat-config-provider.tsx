@@ -195,6 +195,7 @@ export const AgentChatProvider = ({ config, conversationId, children }: AgentCha
     console.log('🌐 [Client] Creating transport with conversation_id:', conversationId);
     return new DefaultChatTransport({
       api: config.route,
+      headers: config.headers,
       prepareSendMessagesRequest: (options) => {
         console.log('🌐 [Client] prepareSendMessagesRequest: using conversationId =', conversationId);
 
@@ -215,7 +216,7 @@ export const AgentChatProvider = ({ config, conversationId, children }: AgentCha
         };
       },
     });
-  }, [config.route]); // Remove conversationId dependency since it's captured in closure
+  }, [config.route, config.headers]); // Add headers dependency
 
   const chatOptions = useMemo(() => {
     return {

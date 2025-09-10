@@ -78,6 +78,7 @@ export interface AgentChatConfig {
   toolRenderers?: Record<string, React.ComponentType<{ toolCall: ToolCall; toolResult?: ToolResult }>>;
   toolExecution?: ToolExecutionConfig;
   showDebugPanel?: boolean; // Show debug panel (defaults to NODE_ENV === 'development')
+  headers?: Record<string, string>; // Custom headers to pass to chat requests
 }
 
 const DEFAULT_TOOL_EXECUTION_CONFIG: ToolExecutionConfig = {
@@ -91,13 +92,15 @@ export function makeAgentChatClientConfig<TTools extends ToolsObject>({
   tools,
   toolExecutionConfig,
   historyRoute,
-  showDebugPanel
+  showDebugPanel,
+  headers
 }: {
   route: string;
   tools: TTools;
   toolExecutionConfig?: Partial<ToolExecutionConfig>;
   historyRoute?: string;
   showDebugPanel?: boolean;
+  headers?: Record<string, string>;
 }): AgentChatConfig {
   const finalExecutionConfig = { ...DEFAULT_TOOL_EXECUTION_CONFIG, ...toolExecutionConfig };
   
@@ -114,6 +117,7 @@ export function makeAgentChatClientConfig<TTools extends ToolsObject>({
     historyRoute: historyRoute || `${route}/history`,
     toolExecution: finalExecutionConfig,
     showDebugPanel: showDebugPanel ?? isDevMode(), // Default to development mode detection
+    headers,
     // toolRenderers should be added separately on client-side
   };
 }
@@ -127,7 +131,8 @@ export function makeAgentChatConfig<TTools extends ToolsObject>({
   modelConfig,
   storage,
   historyRoute,
-  showDebugPanel
+  showDebugPanel,
+  headers
 }: {
   system_prompt: string;
   route: string;
@@ -138,8 +143,9 @@ export function makeAgentChatConfig<TTools extends ToolsObject>({
   storage?: any;
   historyRoute?: string;
   showDebugPanel?: boolean;
+  headers?: Record<string, string>;
 }): { agentChatConfig: AgentChatConfig } {
   return {
-    agentChatConfig: makeAgentChatClientConfig({ route, tools, toolExecutionConfig, historyRoute, showDebugPanel })
+    agentChatConfig: makeAgentChatClientConfig({ route, tools, toolExecutionConfig, historyRoute, showDebugPanel, headers })
   };
 }
