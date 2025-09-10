@@ -15,6 +15,9 @@ export const agentChatClientConfig: AgentChatConfig = {
   toolRenderers: {
     'list_files': ToolRenderer,
   },
+  headers: {
+    "TEST": "TEST",
+  },
   showDebugPanel: process.env.NODE_ENV === 'development',
 };
 

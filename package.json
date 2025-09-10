@@ -1,6 +1,6 @@
 {
   "name": "react-ai-agent-chat-sdk",
-  "version": "0.2.8",
+  "version": "0.2.9",
   "description": "A React library for building AI-powered chat interfaces with tool execution, configurable timeouts, retry logic, and custom renderers",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",

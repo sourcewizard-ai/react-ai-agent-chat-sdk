@@ -213,7 +213,10 @@ export const AgentChatProvider = ({ config, conversationId, children }: AgentCha
 
         return {
           body: requestBody,
-          headers: options.headers,
+          headers: {
+            ...options.headers,
+            ...config.headers,
+          },
         };
       },
     });
